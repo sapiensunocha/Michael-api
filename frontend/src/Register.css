@@ -3,26 +3,31 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 100vh; /* Ensure it takes full viewport height */
-  background-color: #f5f7fa; /* Light grey background, consistent with login */
+  min-height: 100vh;
+  background-color: #f5f7fa;
   padding: 20px;
   box-sizing: border-box;
 }
 
 /* Register Card Styling */
 .register-card {
-  background-color: #ffffff; /* White card background */
+  background-color: #ffffff;
   padding: 40px;
-  border-radius: 12px; /* More rounded corners */
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1); /* Deeper shadow */
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
   width: 100%;
-  max-width: 450px; /* Slightly wider than login for more fields */
+  max-width: 450px;
   text-align: center;
   box-sizing: border-box;
+  transition: transform 0.2s ease;
+}
+
+.register-card:hover {
+  transform: translateY(-3px);
 }
 
 .register-card h2 {
-  color: #003087; /* UN blue for heading */
+  color: #003087;
   margin-bottom: 30px;
   font-size: 2rem;
   font-weight: 700;
@@ -32,29 +37,70 @@
 .register-form {
   display: flex;
   flex-direction: column;
-  gap: 15px; /* Space between form groups */
+  gap: 15px;
 }
 
-/* Form Group (inherited from App.css) */
+/* Form Group */
 .register-form .form-group {
-  margin-bottom: 0; /* Override default margin from App.css if needed */
+  display: flex;
+  flex-direction: column;
+  text-align: left;
 }
 
-/* Input Fields (inherited from App.css) */
+/* Labels */
+.register-form label {
+  margin-bottom: 5px;
+  font-weight: 600;
+  color: #333;
+}
+
+/* Input Fields */
 .register-form input {
-  /* Specific styling for register inputs if different from global */
+  padding: 12px 15px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  font-size: 1rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-/* Error Message (inherited from App.css) */
+.register-form input:focus {
+  border-color: #003087;
+  box-shadow: 0 0 5px rgba(0, 48, 135, 0.3);
+  outline: none;
+}
+
+/* Error Message */
 .register-card .error-message {
-  margin-top: 15px;
+  color: #ff4d4f;
+  font-size: 0.9rem;
+  margin-top: 10px;
   margin-bottom: 0;
+  text-align: left;
 }
 
-/* Register Button (inherited from App.css) */
+/* Register Button */
 .register-button {
-  width: 100%; /* Full width button */
-  margin-top: 20px; /* Space above button */
+  width: 100%;
+  padding: 12px 0;
+  margin-top: 20px;
+  background-color: #003087;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+.register-button:hover {
+  background-color: #001f52;
+  transform: translateY(-1px);
+}
+
+.register-button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
 }
 
 /* Login Link */
@@ -62,18 +108,19 @@
   margin-top: 25px;
   font-size: 0.95rem;
   color: #555;
+  text-align: center;
 }
 
 .login-link span {
-  color: #003087; /* UN blue for clickable link */
+  color: #003087;
   cursor: pointer;
   font-weight: 600;
   text-decoration: none;
-  transition: color 0.2s ease;
+  transition: color 0.2s ease, text-decoration 0.2s ease;
 }
 
 .login-link span:hover {
-  color: #001f52; /* Darker blue on hover */
+  color: #001f52;
   text-decoration: underline;
 }
 
@@ -90,7 +137,7 @@
   }
 
   .register-button {
-    padding: 10px 15px;
+    padding: 10px 0;
     font-size: 0.9rem;
   }
 }
