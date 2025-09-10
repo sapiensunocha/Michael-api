@@ -1,0 +1,92 @@
+/* Confirmation Page Container */
+.confirmation-container {
+display: flex;
+justify-content: center;
+align-items: center;
+min-height: 100vh;
+background-color: #f5f7fa;
+padding: 20px;
+box-sizing: border-box;
+}
+
+/* Confirmation Card Styling */
+.confirmation-card {
+background-color: #ffffff;
+padding: 40px;
+border-radius: 12px;
+box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+width: 100%;
+max-width: 450px;
+text-align: center;
+box-sizing: border-box;
+}
+
+.confirmation-card h2 {
+color: #003087;
+margin-bottom: 20px;
+font-size: 2rem;
+font-weight: 700;
+}
+
+/* Message Styling */
+.confirmation-message {
+margin-top: 20px;
+font-size: 1.1rem;
+line-height: 1.6;
+}
+
+.message.loading {
+color: #555;
+}
+
+.message.success {
+color: #28a745; /* Green for success */
+font-weight: 600;
+}
+
+.message.error {
+color: #dc3545; /* Red for error */
+font-weight: 600;
+}
+
+/* Redirect button and link */
+.redirect-button,
+.redirect-link {
+margin-top: 20px;
+display: inline-block;
+font-weight: 600;
+transition: color 0.2s ease;
+cursor: pointer;
+}
+
+.redirect-button {
+background-color: #003087;
+color: white;
+padding: 12px 25px;
+border: none;
+border-radius: 8px;
+font-size: 1rem;
+cursor: pointer;
+transition: background-color 0.2s ease;
+}
+
+.redirect-button:hover {
+background-color: #001f52;
+}
+
+.redirect-link {
+color: #003087;
+text-decoration: underline;
+}
+
+.redirect-link:hover {
+color: #001f52;
+}
+
+/* Responsive adjustments */
+@media (max-width: 480px) {
+.confirmation-card {
+padding: 25px;
+margin: 0 15px;
+}
+}
