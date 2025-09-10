@@ -293,14 +293,15 @@ export const getGlobalDashboardData = async () => {
     if (acledError) console.error('Error fetching ACLED data:', acledError.message);
 
     // Transform and combine data, filtering for recent events after fetching
-    if (usgsData) allAlerts.push(...usgsData.filter(raw => new Date(raw.raw_data?.time) >= oneDayAgo).map(transformUsgsData));
-    if (gdacsData) allAlerts.push(...gdacsData.filter(raw => new Date(raw.raw_feature?.properties?.eventdate) >= oneDayAgo).map(transformGdacsData));
+    if (usgsData) allAlerts.push(...usgsData.filter(raw => raw.raw_data?.time && new Date(raw.raw_data.time) >= oneDayAgo).map(transformUsgsData));
+    if (gdacsData) allAlerts.push(...gdacsData.filter(raw => raw.raw_feature?.properties?.eventdate && new Date(raw.raw_feature.properties.eventdate) >= oneDayAgo).map(transformGdacsData));
     if (firmsData) allAlerts.push(...firmsData.filter(raw => {
+      if (!raw.raw_fire_data?.acq_date) return false;
       const timeString = raw.raw_fire_data?.acq_time.padStart(4, '0');
       const isoDate = `${raw.raw_fire_data?.acq_date}T${timeString.substring(0, 2)}:${timeString.substring(2, 4)}:00.000Z`;
       return new Date(isoDate) >= oneDayAgo;
     }).map(transformFirmsData));
-    if (acledData) allAlerts.push(...acledData.filter(raw => new Date(raw.raw_event_data?.event_date) >= oneDayAgo).map(transformAcledData));
+    if (acledData) allAlerts.push(...acledData.filter(raw => raw.raw_event_data?.event_date && new Date(raw.raw_event_data.event_date) >= oneDayAgo).map(transformAcledData));
 
     // Sort the combined alerts by start time, most recent first
     allAlerts.sort((a, b) => new Date(b.start_time) - new Date(a.start_time));
@@ -387,14 +388,15 @@ export const getTrendingInsights = async () => {
       supabase.from('acled_raw').select('raw_event_data'),
     ]);
 
-    if (usgsData) allAlerts.push(...usgsData.filter(raw => new Date(raw.raw_data?.time) >= sevenDaysAgo).map(transformUsgsData));
-    if (gdacsData) allAlerts.push(...gdacsData.filter(raw => new Date(raw.raw_feature?.properties?.eventdate) >= sevenDaysAgo).map(transformGdacsData));
+    if (usgsData) allAlerts.push(...usgsData.filter(raw => raw.raw_data?.time && new Date(raw.raw_data.time) >= sevenDaysAgo).map(transformUsgsData));
+    if (gdacsData) allAlerts.push(...gdacsData.filter(raw => raw.raw_feature?.properties?.eventdate && new Date(raw.raw_feature.properties.eventdate) >= sevenDaysAgo).map(transformGdacsData));
     if (firmsData) allAlerts.push(...firmsData.filter(raw => {
+      if (!raw.raw_fire_data?.acq_date) return false;
       const timeString = raw.raw_fire_data?.acq_time.padStart(4, '0');
       const isoDate = `${raw.raw_fire_data?.acq_date}T${timeString.substring(0, 2)}:${timeString.substring(2, 4)}:00.000Z`;
       return new Date(isoDate) >= sevenDaysAgo;
     }).map(transformFirmsData));
-    if (acledData) allAlerts.push(...acledData.filter(raw => new Date(raw.raw_event_data?.event_date) >= sevenDaysAgo).map(transformAcledData));
+    if (acledData) allAlerts.push(...acledData.filter(raw => raw.raw_event_data?.event_date && new Date(raw.raw_event_data.event_date) >= sevenDaysAgo).map(transformAcledData));
 
 
     const groupedByDateAndType = {};
