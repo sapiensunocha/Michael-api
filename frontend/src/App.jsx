@@ -6,17 +6,17 @@ import Login from './Login';
 import Dashboard from './Dashboard';
 import PricingPage from './pages/PricingPage';
 import Profile from './pages/Profile';
-import Confirmation from './Confirmation'; // Import the new Confirmation component
+import Confirmation from './Confirmation'; // Email confirmation page
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import Register from './Register';
 import Payment from './Payment';
-import './App.css'; // Main application styling
+import './App.css';
 
 // Component to protect private routes
 const PrivateRoute = ({ children }) => {
-  const { user, loading } = React.useContext(AuthContext); // Also check loading state
+  const { user, loading } = React.useContext(AuthContext);
   if (loading) {
-    return <div>Loading authentication...</div>; // Or a spinner/skeleton
+    return <div>Loading authentication...</div>; // Can replace with spinner
   }
   return user ? children : <Navigate to="/login" replace />;
 };
@@ -24,13 +24,12 @@ const PrivateRoute = ({ children }) => {
 function App() {
   return (
     <Router>
-      <AuthProvider> {/* Corrected usage: AuthProvider */}
+      <AuthProvider>
         <div className="app-container">
           <Routes>
             {/* Public routes */}
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
-            {/* NEW: Add the public route for email confirmation */}
             <Route path="/confirmation" element={<Confirmation />} />
 
             {/* Private routes */}
@@ -58,7 +57,6 @@ function App() {
                 </PrivateRoute>
               }
             />
-            {/* New Private Profile Route */}
             <Route
               path="/profile"
               element={
@@ -78,6 +76,6 @@ function App() {
       </AuthProvider>
     </Router>
   );
-  }
+}
 
 export default App;

@@ -1,7 +1,7 @@
 // frontend/src/Confirmation.jsx
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { confirmUser } from './api/backendApi'; // <-- backend API
+import { confirmUser } from './api/backendApi'; // Backend API call
 import './Confirmation.css';
 
 function Confirmation() {
@@ -21,10 +21,13 @@ function Confirmation() {
 
     const verifyToken = async () => {
       try {
+        setStatus('loading');
+        setMessage('Verifying your email... Please wait.');
+
         // Call backend API to confirm user
         const response = await confirmUser(token);
 
-        if (response.success) {
+        if (response?.success) {
           setStatus('success');
           setMessage(
             'Your email is now a key to a world that watches, learns, and protects. ' +
@@ -34,11 +37,15 @@ function Confirmation() {
           );
         } else {
           setStatus('error');
-          setMessage(response.message || 'Email not confirmed yet. Please try again or request a new confirmation link.');
+          setMessage(response?.message || 
+            'Email confirmation failed. The link may have expired or already been used. ' +
+            'You can request a new confirmation email.'
+          );
         }
       } catch (err) {
+        console.error('Confirmation API error:', err);
         setStatus('error');
-        setMessage(err.message || 'An error occurred during confirmation.');
+        setMessage(err.message || 'An unexpected error occurred during confirmation.');
       }
     };
 
@@ -52,27 +59,29 @@ function Confirmation() {
         <h2>Email Confirmation</h2>
         <div className="confirmation-message">
           {status === 'loading' && (
-            <p className="message loading">
-              Verifying your email... Please wait.
-            </p>
+            <p className="message loading">{message}</p>
           )}
           {status === 'success' && (
-            <p className="message success">
-              {message}
-              <br />
-              <button onClick={() => navigate('/login')} className="redirect-button">
+            <>
+              <p className="message success">{message}</p>
+              <button
+                onClick={() => navigate('/login')}
+                className="redirect-button"
+              >
                 Continue to Login
               </button>
-            </p>
+            </>
           )}
           {status === 'error' && (
-            <p className="message error">
-              {message}
-              <br />
-              <span onClick={() => navigate('/register')} className="redirect-link">
+            <>
+              <p className="message error">{message}</p>
+              <span
+                onClick={() => navigate('/register')}
+                className="redirect-link"
+              >
                 Go back to registration
               </span>
-            </p>
+            </>
           )}
         </div>
       </div>
