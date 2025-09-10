@@ -181,93 +181,235 @@ export const createCheckoutSession = async (token, planId, successUrl, cancelUrl
 };
 
 /**
- * @desc Fetches global dashboard summary data and active alerts from Supabase.
+ * @desc Confirms a user using the token sent via email after registration.
+ * @param {string} token - The confirmation token from the email link.
+ * @returns {Promise<Object>} { success: boolean, message: string }
+ */
+export const confirmUser = async (token) => {
+  try {
+    const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/confirm`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    });
+
+    const data = await response.json();
+
+    return {
+      success: data.success || false,
+      message: data.message || '',
+    };
+  } catch (err) {
+    console.error('Error confirming user:', err);
+    return { success: false, message: err.message || 'Confirmation failed.' };
+  }
+};
+
+/**
+ * @desc Fetches global dashboard summary data and active alerts from all raw data tables.
  * @returns {Promise<Object>} Object containing globalSummary and activeAlerts.
  */
 export const getGlobalDashboardData = async () => {
-  console.log('Fetching real global dashboard data from Supabase...');
+  console.log('Fetching and processing global dashboard data from raw tables...');
 
-  let activeAlerts = [];
-  let globalSummary = {
-    criticalAlerts: 0,
-    locationsAffectedWorldwide: 0,
-    globalSeverityLevel: 'No active alerts',
-    totalSources: 0,
+  let allAlerts = [];
+  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+  // Helper functions to transform raw data to a unified format
+  const transformUsgsData = (raw) => ({
+    id: `usgs-${raw.usgs_event_id}`,
+    source_event_id: raw.usgs_event_id,
+    source: 'USGS',
+    event_type: 'Earthquake',
+    latitude: parseFloat(raw.raw_data?.latitude),
+    longitude: parseFloat(raw.raw_data?.longitude),
+    severity_level: Math.floor(parseFloat(raw.raw_data?.mag)),
+    location_name: raw.raw_data?.place,
+    alert_message: `Magnitude ${raw.raw_data?.mag} earthquake`,
+    start_time: new Date(raw.raw_data?.time).toISOString(),
+  });
+
+  const transformGdacsData = (raw) => ({
+    id: `gdacs-${raw.gdacs_event_id}`,
+    source_event_id: raw.gdacs_event_id,
+    source: 'GDACS',
+    event_type: raw.raw_feature?.properties?.eventtype,
+    latitude: raw.raw_feature?.properties?.latitude,
+    longitude: raw.raw_feature?.properties?.longitude,
+    severity_level: raw.raw_feature?.properties?.severitylevel,
+    location_name: raw.raw_feature?.properties?.countryname,
+    alert_message: raw.raw_feature?.properties?.alertlevel,
+    start_time: new Date(raw.raw_feature?.properties?.eventdate).toISOString(),
+  });
+
+  const transformFirmsData = (raw) => {
+    const timeString = raw.raw_fire_data?.acq_time.padStart(4, '0');
+    const isoDate = `${raw.raw_fire_data?.acq_date}T${timeString.substring(0, 2)}:${timeString.substring(2, 4)}:00.000Z`;
+    return {
+      id: `firms-${raw.firms_event_id}`,
+      source_event_id: raw.firms_event_id,
+      source: 'FIRMS',
+      event_type: 'Wildfire Warning',
+      latitude: parseFloat(raw.raw_fire_data?.latitude),
+      longitude: parseFloat(raw.raw_fire_data?.longitude),
+      severity_level: Math.floor(raw.raw_fire_data?.confidence / 20) + 1, // Map confidence (0-100) to severity (1-5)
+      location_name: `Wildfire near ${raw.raw_fire_data?.country}`,
+      alert_message: `High confidence wildfire detected.`,
+      start_time: new Date(isoDate).toISOString(),
+    };
   };
 
+  const transformAcledData = (raw) => ({
+    id: `acled-${raw.acled_event_id}`,
+    source_event_id: raw.acled_event_id,
+    source: 'ACLED',
+    event_type: raw.raw_event_data?.event_type,
+    latitude: parseFloat(raw.raw_event_data?.latitude),
+    longitude: parseFloat(raw.raw_event_data?.longitude),
+    severity_level: raw.raw_event_data?.fatalities > 0 ? (raw.raw_event_data?.fatalities > 10 ? 5 : 3) : 1, // Map fatalities to severity
+    location_name: raw.raw_event_data?.location,
+    alert_message: `${raw.raw_event_data?.fatalities} fatalities reported.`,
+    start_time: new Date(raw.raw_event_data?.event_date).toISOString(),
+  });
+
   try {
-    const { data: alerts, error } = await supabase
-      .from('alerts')
-      .select('id, event_type, severity_level, alert_message, start_time, latitude, longitude, location_name, source, country, city')
-      .or('end_time.is.null,end_time.gte.now()')
-      .order('created_at', { ascending: false });
+    // Fetch from all raw tables in parallel
+    const [
+      { data: usgsData, error: usgsError },
+      { data: gdacsData, error: gdacsError },
+      { data: firmsData, error: firmsError },
+      { data: acledData, error: acledError }
+    ] = await Promise.all([
+      supabase.from('usgs_raw').select('usgs_event_id, raw_data').gte('created_at', oneDayAgo),
+      supabase.from('gdacs_raw').select('gdacs_event_id, raw_feature').gte('created_at', oneDayAgo),
+      supabase.from('firms_raw').select('firms_event_id, raw_fire_data').gte('created_at', oneDayAgo),
+      supabase.from('acled_raw').select('acled_event_id, raw_event_data').gte('created_at', oneDayAgo),
+    ]);
 
-    if (error) {
-      console.error('Supabase Global Dashboard Data Fetch Error:', error);
-      return { globalSummary, activeAlerts };
-    }
+    if (usgsError) console.error('Error fetching USGS data:', usgsError.message);
+    if (gdacsError) console.error('Error fetching GDACS data:', gdacsError.message);
+    if (firmsError) console.error('Error fetching FIRMS data:', firmsError.message);
+    if (acledError) console.error('Error fetching ACLED data:', acledError.message);
 
-    activeAlerts = alerts || [];
+    // Transform and combine data
+    if (usgsData) allAlerts.push(...usgsData.map(transformUsgsData));
+    if (gdacsData) allAlerts.push(...gdacsData.map(transformGdacsData));
+    if (firmsData) allAlerts.push(...firmsData.map(transformFirmsData));
+    if (acledData) allAlerts.push(...acledData.map(transformAcledData));
 
+    // Sort the combined alerts by start time, most recent first
+    allAlerts.sort((a, b) => new Date(b.start_time) - new Date(a.start_time));
+
+    // Calculate summary statistics
     let criticalAlertsCount = 0;
     const uniqueLocations = new Set();
     let maxSeverity = 0;
+    const uniqueSources = new Set();
+    const uniqueSourceEvents = new Set();
 
-    activeAlerts.forEach(alert => {
-      if (alert.severity_level >= 4) criticalAlertsCount++;
+    allAlerts.forEach(alert => {
+      if (!uniqueSourceEvents.has(alert.source_event_id)) {
+        uniqueSourceEvents.add(alert.source_event_id);
+        if (alert.severity_level >= 4) criticalAlertsCount++;
+        uniqueSources.add(alert.source);
+      }
       if (alert.location_name) uniqueLocations.add(alert.location_name);
-      else if (alert.latitude && alert.longitude) uniqueLocations.add(`${alert.latitude},${alert.longitude}`);
       if (alert.severity_level && alert.severity_level > maxSeverity) maxSeverity = alert.severity_level;
     });
 
     let globalSeverityLevelText = 'No Active Alerts';
-    if (activeAlerts.length > 0) {
+    if (allAlerts.length > 0) {
       if (maxSeverity >= 5) globalSeverityLevelText = 'High Global Severity';
       else if (maxSeverity >= 3) globalSeverityLevelText = 'Moderate Global Severity';
       else globalSeverityLevelText = 'Low Global Severity';
     }
 
-    globalSummary = {
+    const globalSummary = {
       criticalAlerts: criticalAlertsCount,
       locationsAffectedWorldwide: uniqueLocations.size,
       globalSeverityLevel: globalSeverityLevelText,
-      totalSources: 1500000,
+      totalSources: uniqueSources.size,
     };
 
-    return { globalSummary, activeAlerts };
+    return { globalSummary, activeAlerts: allAlerts };
 
   } catch (err) {
     console.error("An unexpected error occurred while fetching global dashboard data:", err);
-    return { globalSummary, activeAlerts };
+    // Return empty data on failure to prevent app crash
+    return {
+      globalSummary: {
+        criticalAlerts: 0,
+        locationsAffectedWorldwide: 0,
+        globalSeverityLevel: 'N/A',
+        totalSources: 0
+      },
+      activeAlerts: []
+    };
   }
 };
 
+
 /**
- * @desc Fetches trending insights data.
+ * @desc Fetches trending insights data by processing raw data.
  * @returns {Promise<Array<Object>>} Array of trending insight data.
  */
 export const getTrendingInsights = async () => {
-  console.log('Fetching placeholder trending insights data...');
-  return new Promise(resolve => {
-    setTimeout(() => {
-      const today = new Date();
-      const data = [];
-      for (let i = 6; i >= 0; i--) {
-        const d = new Date(today);
-        d.setDate(today.getDate() - i);
-        data.push({
-          date: d.toISOString().split('T')[0],
-          'Flood Alert': Math.floor(Math.random() * 50) + 10,
-          'Wildfire Warning': Math.floor(Math.random() * 40) + 5,
-          'Earthquake': Math.floor(Math.random() * 30) + 3,
-          'Cyber Attack Threat': Math.floor(Math.random() * 60) + 15,
-          'Hurricane Advisory': Math.floor(Math.random() * 35) + 7,
-          'Drought Watch': Math.floor(Math.random() * 25) + 2,
-        });
+  console.log('Processing real data for trending insights...');
+
+  // Fetch all alerts from the past 7 days
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  let allAlerts = [];
+
+  const transformUsgsData = (raw) => ({ event_type: 'Earthquake', start_time: new Date(raw.raw_data?.time) });
+  const transformGdacsData = (raw) => ({ event_type: raw.raw_feature?.properties?.eventtype, start_time: new Date(raw.raw_feature?.properties?.eventdate) });
+  const transformFirmsData = (raw) => {
+    const timeString = raw.raw_fire_data?.acq_time.padStart(4, '0');
+    const isoDate = `${raw.raw_fire_data?.acq_date}T${timeString.substring(0, 2)}:${timeString.substring(2, 4)}:00.000Z`;
+    return { event_type: 'Wildfire Warning', start_time: new Date(isoDate) };
+  };
+  const transformAcledData = (raw) => ({ event_type: raw.raw_event_data?.event_type, start_time: new Date(raw.raw_event_data?.event_date) });
+
+  try {
+    const [
+      { data: usgsData },
+      { data: gdacsData },
+      { data: firmsData },
+      { data: acledData }
+    ] = await Promise.all([
+      supabase.from('usgs_raw').select('raw_data').gte('created_at', sevenDaysAgo),
+      supabase.from('gdacs_raw').select('raw_feature').gte('created_at', sevenDaysAgo),
+      supabase.from('firms_raw').select('raw_fire_data').gte('created_at', sevenDaysAgo),
+      supabase.from('acled_raw').select('raw_event_data').gte('created_at', sevenDaysAgo),
+    ]);
+
+    if (usgsData) allAlerts.push(...usgsData.map(transformUsgsData));
+    if (gdacsData) allAlerts.push(...gdacsData.map(transformGdacsData));
+    if (firmsData) allAlerts.push(...firmsData.map(transformFirmsData));
+    if (acledData) allAlerts.push(...acledData.map(transformAcledData));
+
+    const groupedByDateAndType = {};
+    allAlerts.forEach(alert => {
+      const dateKey = alert.start_time.toISOString().split('T')[0];
+      const eventType = alert.event_type;
+      if (!groupedByDateAndType[dateKey]) {
+        groupedByDateAndType[dateKey] = {};
       }
-      resolve(data);
-    }, 500);
-  });
+      groupedByDateAndType[dateKey][eventType] = (groupedByDateAndType[dateKey][eventType] || 0) + 1;
+    });
+
+    const insightsData = Object.keys(groupedByDateAndType).map(date => {
+      return {
+        date,
+        ...groupedByDateAndType[date]
+      };
+    }).sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    return insightsData;
+  } catch (err) {
+    console.error('Error fetching trending insights:', err);
+    // Return placeholder data on failure to prevent app crash
+    return [];
+  }
 };
 
 /**
@@ -298,30 +440,5 @@ export const generateWorldSummary = async (dataForAI, token) => {
   } catch (err) {
     console.error('Error in generateWorldSummary API call:', err);
     throw err;
-  }
-};
-
-/**
- * @desc Confirms a user using the token sent via email after registration.
- * @param {string} token - The confirmation token from the email link.
- * @returns {Promise<Object>} { success: boolean, message: string }
- */
-export const confirmUser = async (token) => {
-  try {
-    const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/confirm`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token }),
-    });
-
-    const data = await response.json();
-
-    return {
-      success: data.success || false,
-      message: data.message || '',
-    };
-  } catch (err) {
-    console.error('Error confirming user:', err);
-    return { success: false, message: err.message || 'Confirmation failed.' };
   }
 };
