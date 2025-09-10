@@ -1,9 +1,9 @@
-// frontend/src/Login.jsx (KEEP THIS AS IS - your "working perfectly" version)
+// frontend/src/Login.jsx
 import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from './context/AuthContext';
-import { loginUser } from './api/backendApi';
-import './Login.css'; // Assuming you have a Login.css for styling
+import { loginUser } from './api/backendApi'; // <-- Use backend API
+import './Login.css';
 
 function Login() {
   const [email, setEmail] = useState('');
@@ -19,8 +19,17 @@ function Login() {
     setLoading(true);
 
     try {
-      const userData = await loginUser({ email, password }); // This userData is { token: "...", user: { ...enrichedUser... } }
-      login(userData); // Pass the entire object to AuthContext's login
+      // Use backend API for login
+      const { token, user } = await loginUser({ email, password });
+
+      if (!user) {
+        setError('Login failed. Please check your credentials.');
+        setLoading(false);
+        return;
+      }
+
+      // Log in user in AuthContext
+      login({ token, user });
       navigate('/dashboard');
     } catch (err) {
       console.error('Login failed:', err);
@@ -33,7 +42,6 @@ function Login() {
   return (
     <div className="login-container">
       <div className="login-card">
-        {/* Add your logo here */}
         <img src="/logo.png" alt="Michael API Logo" className="login-logo" />
         <h2>Login</h2>
         <form onSubmit={handleLogin} className="login-form">

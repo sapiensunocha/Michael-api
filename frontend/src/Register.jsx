@@ -1,23 +1,25 @@
+// frontend/src/Register.jsx
 import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AuthContext } from './context/AuthContext'; // Import AuthContext
-import { registerUser } from './api/backendApi'; // Import the registerUser API call
-import './Register.css'; // Assuming you'll create a Register.css for styling
+import { AuthContext } from './context/AuthContext';
+import { registerUser } from './api/backendApi'; // <-- backend API
+import './Register.css';
 
 function Register() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [error, setError] = useState(null); // State to hold error messages
-  const [loading, setLoading] = useState(false); // State to indicate loading
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState(''); // status message
   const navigate = useNavigate();
-  const { login } = useContext(AuthContext); // Get the login function from AuthContext
+  const { login } = useContext(AuthContext);
 
   const handleRegister = async (e) => {
     e.preventDefault();
-    setError(null); // Clear previous errors
-    setLoading(true); // Set loading state
+    setError(null);
+    setLoading(true);
 
     if (password !== confirmPassword) {
       setError('Passwords do not match.');
@@ -26,19 +28,29 @@ function Register() {
     }
 
     try {
-      // Call your backend registration API
-      const userData = await registerUser({ name, email, password });
+      // Call backend API
+      const { user, token, message } = await registerUser({ name, email, password });
 
-      // If registration is successful, update AuthContext and navigate to dashboard
-      login(userData); // Store user data and token in context
+      if (!user) {
+        setError(message || 'Registration failed. Please try again.');
+        setLoading(false);
+        return;
+      }
+
+      setStatus('Welcome! Please check your email to confirm your account and join the mission to help end disaster impacts.');
+      setName('');
+      setEmail('');
+      setPassword('');
+      setConfirmPassword('');
+
+      // Optionally log in user immediately
+      login({ token, user });
       navigate('/dashboard');
-
     } catch (err) {
-      // Handle registration errors from the backend
       console.error('Registration failed:', err);
       setError(err.message || 'Registration failed. Please try again.');
     } finally {
-      setLoading(false); // Reset loading state
+      setLoading(false);
     }
   };
 
@@ -92,6 +104,7 @@ function Register() {
             />
           </div>
           {error && <p className="error-message">{error}</p>}
+          {status && <p className="success-message">{status}</p>}
           <button type="submit" disabled={loading} className="register-button">
             {loading ? 'Registering...' : 'Register'}
           </button>

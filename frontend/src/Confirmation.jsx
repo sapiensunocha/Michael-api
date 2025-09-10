@@ -1,32 +1,8 @@
+// frontend/src/Confirmation.jsx
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { confirmUser } from './api/backendApi'; // <-- backend API
 import './Confirmation.css';
-
-// Placeholder for the backend API call to confirm the user's email.
-// In a real application, you would replace this with a call to your
-// backend, passing the confirmation token from the URL.
-// This function would typically return a success or error message.
-const confirmUserEmail = async (token) => {
-  // Simulate an API call
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      if (token) {
-        // Here you would make an actual API call, e.g., using axios or fetch:
-        // const response = await fetch(`/api/confirm-email?token=${token}`);
-        // if (response.ok) {
-        //   resolve({ success: true, message: 'Your email has been successfully confirmed!' });
-        // } else {
-        //   reject(new Error('Invalid or expired confirmation token.'));
-        // }
-        
-        // For demonstration, we'll assume a valid token resolves successfully.
-        resolve({ success: true, message: 'Your email has been successfully confirmed!' });
-      } else {
-        reject(new Error('No confirmation token found.'));
-      }
-    }, 1500); // Simulate a network delay
-  });
-};
 
 function Confirmation() {
   const [searchParams] = useSearchParams();
@@ -45,13 +21,20 @@ function Confirmation() {
 
     const verifyToken = async () => {
       try {
-        const result = await confirmUserEmail(token);
-        if (result.success) {
+        // Call backend API to confirm user
+        const response = await confirmUser(token);
+
+        if (response.success) {
           setStatus('success');
-          setMessage(result.message);
+          setMessage(
+            'Your email is now a key to a world that watches, learns, and protects. ' +
+            'You are part of Michael — our global guardian scanning skies, rivers, and cities, alerting when danger whispers. ' +
+            'From this moment, your journey begins: a journey of foresight, resilience, and hope. ' +
+            'Thank you for joining the World Disaster Center.'
+          );
         } else {
           setStatus('error');
-          setMessage('Email confirmation failed. Please try again.');
+          setMessage(response.message || 'Email not confirmed yet. Please try again or request a new confirmation link.');
         }
       } catch (err) {
         setStatus('error');
@@ -65,6 +48,7 @@ function Confirmation() {
   return (
     <div className="confirmation-container">
       <div className="confirmation-card">
+        <img src="/logo512.png" alt="WDC Logo" className="wdc-logo" />
         <h2>Email Confirmation</h2>
         <div className="confirmation-message">
           {status === 'loading' && (
