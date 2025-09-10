@@ -213,7 +213,7 @@ export const getGlobalDashboardData = async () => {
   console.log('Fetching and processing global dashboard data from raw tables...');
 
   let allAlerts = [];
-  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
   // Helper functions to transform raw data to a unified format
   const transformUsgsData = (raw) => ({
@@ -273,17 +273,18 @@ export const getGlobalDashboardData = async () => {
   });
 
   try {
-    // Fetch from all raw tables in parallel
+    // Fetch all raw data, as the 'created_at' column is not available to filter by.
+    // NOTE: For very large datasets, a new database schema with an indexed timestamp column would be more efficient.
     const [
       { data: usgsData, error: usgsError },
       { data: gdacsData, error: gdacsError },
       { data: firmsData, error: firmsError },
       { data: acledData, error: acledError }
     ] = await Promise.all([
-      supabase.from('usgs_raw').select('usgs_event_id, raw_data').gte('created_at', oneDayAgo),
-      supabase.from('gdacs_raw').select('gdacs_event_id, raw_feature').gte('created_at', oneDayAgo),
-      supabase.from('firms_raw').select('firms_event_id, raw_fire_data').gte('created_at', oneDayAgo),
-      supabase.from('acled_raw').select('acled_event_id, raw_event_data').gte('created_at', oneDayAgo),
+      supabase.from('usgs_raw').select('usgs_event_id, raw_data'),
+      supabase.from('gdacs_raw').select('gdacs_event_id, raw_feature'),
+      supabase.from('firms_raw').select('firms_event_id, raw_fire_data'),
+      supabase.from('acled_raw').select('acled_event_id, raw_event_data'),
     ]);
 
     if (usgsError) console.error('Error fetching USGS data:', usgsError.message);
@@ -291,11 +292,15 @@ export const getGlobalDashboardData = async () => {
     if (firmsError) console.error('Error fetching FIRMS data:', firmsError.message);
     if (acledError) console.error('Error fetching ACLED data:', acledError.message);
 
-    // Transform and combine data
-    if (usgsData) allAlerts.push(...usgsData.map(transformUsgsData));
-    if (gdacsData) allAlerts.push(...gdacsData.map(transformGdacsData));
-    if (firmsData) allAlerts.push(...firmsData.map(transformFirmsData));
-    if (acledData) allAlerts.push(...acledData.map(transformAcledData));
+    // Transform and combine data, filtering for recent events after fetching
+    if (usgsData) allAlerts.push(...usgsData.filter(raw => new Date(raw.raw_data?.time) >= oneDayAgo).map(transformUsgsData));
+    if (gdacsData) allAlerts.push(...gdacsData.filter(raw => new Date(raw.raw_feature?.properties?.eventdate) >= oneDayAgo).map(transformGdacsData));
+    if (firmsData) allAlerts.push(...firmsData.filter(raw => {
+      const timeString = raw.raw_fire_data?.acq_time.padStart(4, '0');
+      const isoDate = `${raw.raw_fire_data?.acq_date}T${timeString.substring(0, 2)}:${timeString.substring(2, 4)}:00.000Z`;
+      return new Date(isoDate) >= oneDayAgo;
+    }).map(transformFirmsData));
+    if (acledData) allAlerts.push(...acledData.filter(raw => new Date(raw.raw_event_data?.event_date) >= oneDayAgo).map(transformAcledData));
 
     // Sort the combined alerts by start time, most recent first
     allAlerts.sort((a, b) => new Date(b.start_time) - new Date(a.start_time));
@@ -357,7 +362,7 @@ export const getTrendingInsights = async () => {
   console.log('Processing real data for trending insights...');
 
   // Fetch all alerts from the past 7 days
-  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   let allAlerts = [];
 
   const transformUsgsData = (raw) => ({ event_type: 'Earthquake', start_time: new Date(raw.raw_data?.time) });
@@ -376,16 +381,21 @@ export const getTrendingInsights = async () => {
       { data: firmsData },
       { data: acledData }
     ] = await Promise.all([
-      supabase.from('usgs_raw').select('raw_data').gte('created_at', sevenDaysAgo),
-      supabase.from('gdacs_raw').select('raw_feature').gte('created_at', sevenDaysAgo),
-      supabase.from('firms_raw').select('raw_fire_data').gte('created_at', sevenDaysAgo),
-      supabase.from('acled_raw').select('raw_event_data').gte('created_at', sevenDaysAgo),
+      supabase.from('usgs_raw').select('raw_data'),
+      supabase.from('gdacs_raw').select('raw_feature'),
+      supabase.from('firms_raw').select('raw_fire_data'),
+      supabase.from('acled_raw').select('raw_event_data'),
     ]);
 
-    if (usgsData) allAlerts.push(...usgsData.map(transformUsgsData));
-    if (gdacsData) allAlerts.push(...gdacsData.map(transformGdacsData));
-    if (firmsData) allAlerts.push(...firmsData.map(transformFirmsData));
-    if (acledData) allAlerts.push(...acledData.map(transformAcledData));
+    if (usgsData) allAlerts.push(...usgsData.filter(raw => new Date(raw.raw_data?.time) >= sevenDaysAgo).map(transformUsgsData));
+    if (gdacsData) allAlerts.push(...gdacsData.filter(raw => new Date(raw.raw_feature?.properties?.eventdate) >= sevenDaysAgo).map(transformGdacsData));
+    if (firmsData) allAlerts.push(...firmsData.filter(raw => {
+      const timeString = raw.raw_fire_data?.acq_time.padStart(4, '0');
+      const isoDate = `${raw.raw_fire_data?.acq_date}T${timeString.substring(0, 2)}:${timeString.substring(2, 4)}:00.000Z`;
+      return new Date(isoDate) >= sevenDaysAgo;
+    }).map(transformFirmsData));
+    if (acledData) allAlerts.push(...acledData.filter(raw => new Date(raw.raw_event_data?.event_date) >= sevenDaysAgo).map(transformAcledData));
+
 
     const groupedByDateAndType = {};
     allAlerts.forEach(alert => {
